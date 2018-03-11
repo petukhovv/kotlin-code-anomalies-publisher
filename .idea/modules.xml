@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/kotlin-code-anomalies-publisher.iml" filepath="$PROJECT_DIR$/.idea/modules/kotlin-code-anomalies-publisher.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/kotlin-code-anomalies-publisher_main.iml" filepath="$PROJECT_DIR$/.idea/modules/kotlin-code-anomalies-publisher_main.iml" group="kotlin-code-anomalies-publisher" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/kotlin-code-anomalies-publisher_test.iml" filepath="$PROJECT_DIR$/.idea/modules/kotlin-code-anomalies-publisher_test.iml" group="kotlin-code-anomalies-publisher" />
+    </modules>
+  </component>
+</project>

@@ -1,0 +1,12 @@
+<component name="libraryTable">
+  <library name="Gradle: com.github.jkcclemens:khttp:-SNAPSHOT">
+    <CLASSES>
+      <root url="file://$PROJECT_DIR$/Could not find com.github.jkcclemens:khttp:-SNAPSHOT." />
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.github.jkcclemens/khttp/-SNAPSHOT/66ba29f0fd9cf5069402eca453f2bc6e2f7e14a9/khttp--SNAPSHOT.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.github.jkcclemens/khttp/-SNAPSHOT/521d753b9415ec55081e4269cb8b5ed339129872/khttp--SNAPSHOT-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>
