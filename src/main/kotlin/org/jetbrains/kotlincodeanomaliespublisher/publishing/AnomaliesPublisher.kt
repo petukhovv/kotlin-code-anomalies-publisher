@@ -5,22 +5,22 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import org.jetbrains.kotlincodeanomaliespublisher.io.FileWriter
 import org.jetbrains.kotlincodeanomaliespublisher.io.JsonFilesReader
 import org.jetbrains.kotlincodeanomaliespublisher.structures.*
-import org.json.JSONObject
 import org.kohsuke.github.GitHub
 import java.io.File
-import java.lang.System.exit
 import org.kohsuke.github.GHGist
 import org.kohsuke.github.GHRepository
+import java.io.FileNotFoundException
+import java.lang.System.exit
 import java.util.*
 
 
-class AnomaliesPublisher(private val anomalyType: AnomalyType) {
+class AnomaliesPublisher(private val anomalyType: AnomalyType, private val processMethod: ProcessMethod) {
     private val githubApi = GitHub.connect()
     private val repoAnomaliesSiteIdentifier = "PetukhovVictor/code-anomaly-detection"
     private val repoAnomaliesBranch = "gh-pages"
     private val anomalyExamplesConfigFile = "assets/data/anomaly_examples.json"
     private val anomalyExamplesModifiedConfigFile = "./anomaly_examples.json"
-    private var anomaliesObject: JSONObject? = null
+    private var anomaliesObject: MutableMap<String, AnomalyClass>? = null
     private var mapper = ObjectMapper()
     private var siteRepo: GHRepository? = null
 
@@ -30,9 +30,16 @@ class AnomaliesPublisher(private val anomalyType: AnomalyType) {
 
     init {
         siteRepo = githubApi.getRepository(repoAnomaliesSiteIdentifier)
-        val file = siteRepo!!.getFileContent(anomalyExamplesConfigFile, repoAnomaliesBranch)
-        val response = khttp.get(file.downloadUrl)
-        anomaliesObject = response.jsonObject
+        when (processMethod) {
+            ProcessMethod.APPEND -> {
+                val file = siteRepo!!.getFileContent(anomalyExamplesConfigFile, repoAnomaliesBranch)
+                val response = khttp.get(file.downloadUrl)
+                anomaliesObject = mapper.readValue(response.jsonObject.toString(), object: TypeReference<Map<String, AnomalyClass>>() {})
+            }
+            ProcessMethod.OVERWRITE -> {
+                anomaliesObject = mutableMapOf()
+            }
+        }
     }
 
     private fun createGist(classInfo: AnomalyClassInfo, file: File): GHGist {
@@ -51,38 +58,72 @@ class AnomaliesPublisher(private val anomalyType: AnomalyType) {
         return gistBuilder.create()
     }
 
-    fun prepare(anomalyClass: String, classInfoFile: File, files: Set<Pair<File, Boolean>>) {
-        if (anomaliesObject!!.isNull(anomalyClass)) {
-            val anomalyClassInfoReference = object: TypeReference<AnomalyClassInfo>() {}
-            val classInfo = JsonFilesReader.readFile<AnomalyClassInfo>(classInfoFile, anomalyClassInfoReference)
-            val anomalyFiles: MutableMap<String, String> = mutableMapOf()
+    private fun prepareAnomalyExampleFiles(classInfo: AnomalyClassInfo, files: Set<Pair<File, Boolean>>): AnomalyExampleFiles {
+        val anomalyFiles: MutableMap<String, String> = mutableMapOf()
+        files.forEach {
+            if (it.second) {
+                val gist = createGist(classInfo, it.first)
+                val gistCommentsUrlComponents = gist.commentsUrl.split("/")
 
-            files.forEach {
-                if (it.second) {
-                    anomalyFiles[it.first.name] = createGist(classInfo, it.first).toString()
+                anomalyFiles[it.first.name] = gistCommentsUrlComponents[gistCommentsUrlComponents.size - 2]
+            }
+        }
+        return AnomalyExampleFiles(anomalyFiles)
+    }
+
+    private fun checkExistAnomalyExample(anomalyExamples: MutableMap<String, AnomalyExample>, files: Set<Pair<File, Boolean>>): Boolean {
+        anomalyExamples.forEach {
+            it.value.items.forEach {
+                val itemFiles = it.files
+
+                files.forEach {
+                    if (itemFiles.contains(it.first.name)) {
+                        return@checkExistAnomalyExample true
+                    }
                 }
             }
-            val anomalyExampleFiles = AnomalyExampleFiles(anomalyFiles)
-            val anomalyExample = AnomalyExample(1, classInfo.url, listOf(anomalyExampleFiles))
-            val anomalyClassObject = AnomalyClass(classInfo.title, mapOf(anomalyType to anomalyExample))
-
-            anomaliesObject!!.put(anomalyClass, JSONObject(anomalyClassObject))
-        } else {
-            val anomalyFiles: MutableMap<String, String> = mutableMapOf()
-            files.forEach {
-                if (it.second) {
-                    anomalyFiles[it.first.name] = createGist(AnomalyClassInfo(), it.first).toString()
-                }
-            }
-            val anomalyExampleFiles = AnomalyExampleFiles(anomalyFiles)
-            val anomalyExample = AnomalyExample(1, classInfo.url, listOf(anomalyExampleFiles))
         }
 
-        exit(0)
+        return false
+    }
+
+    fun prepare(anomalyClass: String, classInfoFile: File, files: Set<Pair<File, Boolean>>) {
+        val anomalyClassInfoReference = object: TypeReference<AnomalyClassInfo>() {}
+        val classInfo = JsonFilesReader.readFile<AnomalyClassInfo>(classInfoFile, anomalyClassInfoReference)
+
+        if (!anomaliesObject!!.contains(anomalyClass)) {
+            val anomalyExampleFiles = prepareAnomalyExampleFiles(classInfo, files)
+            val anomalyExample = AnomalyExample(1, classInfo.url, mutableListOf(anomalyExampleFiles))
+            val anomalyClassObject = AnomalyClass(classInfo.title, mutableMapOf(anomalyType.toString() to anomalyExample))
+
+            anomaliesObject!![anomalyClass] = anomalyClassObject
+            println("ANOMALY NOT EXIST (CLASS NOT EXIST): $files")
+        } else {
+            val anomalyExamples = anomaliesObject!![anomalyClass]!!.examples
+            if (anomalyExamples.contains(anomalyType.toString())) {
+                if (!checkExistAnomalyExample(anomalyExamples, files)) {
+                    val anomalyExampleFiles = prepareAnomalyExampleFiles(classInfo, files)
+
+                    anomalyExamples[anomalyType.toString()]!!.items.add(anomalyExampleFiles)
+                    anomalyExamples[anomalyType.toString()]!!.total++
+                    println("ANOMALY NOT EXIST (ANOMALY TYPE EXIST): $files")
+                } else {
+                    println("ANOMALY ALREADY EXIST: $files")
+                }
+            } else {
+                val anomalyExampleFiles = prepareAnomalyExampleFiles(classInfo, files)
+
+                anomalyExamples[anomalyType.toString()] = AnomalyExample(
+                        total = 1,
+                        all_url = classInfo.url,
+                        items = mutableListOf(anomalyExampleFiles)
+                )
+                println("ANOMALY NOT EXIST (ANOMALY TYPE NOT EXIST): $files")
+            }
+        }
     }
 
     fun write() {
-        println(anomaliesObject)
         FileWriter.write(anomalyExamplesModifiedConfigFile, anomaliesObject!!)
     }
 
