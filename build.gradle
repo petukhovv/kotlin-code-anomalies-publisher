@@ -22,6 +22,14 @@ repositories {
     }
 }
 
+jar {
+    manifest {
+        attributes 'Main-Class': 'org.jetbrains.kotlincodeanomaliespublisher.MainKt'
+    }
+    from { configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
+    exclude ('META-INF/*.RSA', 'META-INF/*.SF','META-INF/*.DSA')
+}
+
 dependencies {
     compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
     compile "com.fasterxml.jackson.module:jackson-module-kotlin:2.9.0"
